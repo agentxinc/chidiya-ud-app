@@ -14,7 +14,7 @@ import * as Haptics from 'expo-haptics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 
-const { width, height } = Dimensions.get('window');
+const { width } = Dimensions.get('window');
 
 // Flying and non-flying items - comprehensive lists
 const FLYING_ITEMS = [
@@ -143,24 +143,18 @@ export default function App() {
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const shakeAnim = useRef(new Animated.Value(0)).current;
   const feedbackAnim = useRef(new Animated.Value(0)).current;
-  const timerRef = useRef(null);
   const gameLoopRef = useRef(null);
 
-  // Load high score on mount
-  useEffect(() => {
-    loadHighScore();
-  }, []);
-
-  const loadHighScore = async () => {
+  const loadHighScore = useCallback(async () => {
     try {
       const saved = await AsyncStorage.getItem('chidiyaUdHighScore');
       if (saved) setHighScore(parseInt(saved, 10));
     } catch (e) {
       console.log('Error loading high score');
     }
-  };
+  }, []);
 
-  const saveHighScore = async (newScore) => {
+  const saveHighScore = useCallback(async (newScore) => {
     try {
       if (newScore > highScore) {
         await AsyncStorage.setItem('chidiyaUdHighScore', newScore.toString());
@@ -169,7 +163,12 @@ export default function App() {
     } catch (e) {
       console.log('Error saving high score');
     }
-  };
+  }, [highScore]);
+
+  // Load high score on mount
+  useEffect(() => {
+    loadHighScore();
+  }, [loadHighScore]);
 
   const getRandomItem = useCallback(() => {
     const isFlying = Math.random() > 0.5;
@@ -206,24 +205,6 @@ export default function App() {
     setStreak(0);
     nextQuestion();
   }, [nextQuestion]);
-
-  // Game timer
-  useEffect(() => {
-    if (gameState !== GAME_STATES.PLAYING) return;
-
-    gameLoopRef.current = setInterval(() => {
-      setTimeLeft((prev) => {
-        if (prev <= 100) {
-          // Time's up - wrong answer
-          handleAnswer(null);
-          return getTimeForLevel(level);
-        }
-        return prev - 100;
-      });
-    }, 100);
-
-    return () => clearInterval(gameLoopRef.current);
-  }, [gameState, level, getTimeForLevel]);
 
   const showFeedbackAnimation = (isCorrect) => {
     setShowFeedback(isCorrect);
@@ -282,6 +263,24 @@ export default function App() {
       nextQuestion();
     }
   }, [gameState, canFly, streak, level, score, lives, nextQuestion, saveHighScore]);
+
+  // Game timer
+  useEffect(() => {
+    if (gameState !== GAME_STATES.PLAYING) return;
+
+    gameLoopRef.current = setInterval(() => {
+      setTimeLeft((prev) => {
+        if (prev <= 100) {
+          // Time's up - wrong answer
+          handleAnswer(null);
+          return getTimeForLevel(level);
+        }
+        return prev - 100;
+      });
+    }, 100);
+
+    return () => clearInterval(gameLoopRef.current);
+  }, [gameState, handleAnswer, level, getTimeForLevel]);
 
   const renderStartScreen = () => (
     <View style={styles.centerContainer}>
