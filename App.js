@@ -23,8 +23,19 @@ const GAME_STATES = {
   GAME_OVER: 'gameOver',
 };
 
-// Debounce delay to prevent accidental double-taps (ms)
+// Brief feedback pause to prevent accidental double-taps (ms)
 const ANSWER_DEBOUNCE_MS = 300;
+
+const notifyAnswer = async (isCorrect) => {
+  if (Platform.OS === 'web') return;
+  try {
+    await Haptics.notificationAsync(
+      isCorrect ? Haptics.NotificationFeedbackType.Success : Haptics.NotificationFeedbackType.Error
+    );
+  } catch {
+    // Haptics are optional on devices that do not support them.
+  }
+};
 
 const SkyDecor = () => (
   <View style={styles.skyDecor} pointerEvents="none">
@@ -42,6 +53,7 @@ export default function App() {
   const [gameState, setGameState] = useState(GAME_STATES.START);
   const [score, setScore] = useState(0);
   const [highScore, setHighScore] = useState(0);
+  const [isNewHighScore, setIsNewHighScore] = useState(false);
   const [lives, setLives] = useState(3);
   const [level, setLevel] = useState(1);
   const [currentItem, setCurrentItem] = useState('');
@@ -55,6 +67,13 @@ export default function App() {
   const shakeAnim = useRef(new Animated.Value(0)).current;
   const feedbackAnim = useRef(new Animated.Value(0)).current;
   const gameLoopRef = useRef(null);
+  const answerLockRef = useRef(false);
+  const nextQuestionTimeoutRef = useRef(null);
+
+  useEffect(() => () => {
+    clearInterval(gameLoopRef.current);
+    clearTimeout(nextQuestionTimeoutRef.current);
+  }, []);
 
   // Load high score on mount
   useEffect(() => {
@@ -91,12 +110,13 @@ export default function App() {
     return Math.max(1000, 3000 - (lvl - 1) * 200);
   }, []);
 
-  const nextQuestion = useCallback(() => {
+  const nextQuestion = useCallback((questionLevel) => {
     const { item, canFly: flies } = getNextItem();
     setCurrentItem(item);
     setCanFly(flies);
-    setTimeLeft(getTimeForLevel(level));
-    setIsAnswering(false); // Reset debounce lock
+    setTimeLeft(getTimeForLevel(questionLevel));
+    answerLockRef.current = false;
+    setIsAnswering(false);
 
     // Animate item appearance
     scaleAnim.setValue(0.5);
@@ -105,7 +125,7 @@ export default function App() {
       friction: 4,
       useNativeDriver: true,
     }).start();
-  }, [level, getNextItem, getTimeForLevel, scaleAnim]);
+  }, [getNextItem, getTimeForLevel, scaleAnim]);
 
   const startGame = useCallback(() => {
     setGameState(GAME_STATES.PLAYING);
@@ -113,35 +133,24 @@ export default function App() {
     setLives(3);
     setLevel(1);
     setStreak(0);
-    nextQuestion();
-  }, [nextQuestion]);
+    setIsNewHighScore(false);
+    feedbackAnim.stopAnimation();
+    setShowFeedback(null);
+    clearTimeout(nextQuestionTimeoutRef.current);
+    nextQuestion(1);
+  }, [nextQuestion, feedbackAnim]);
 
-  // Game timer
-  useEffect(() => {
-    if (gameState !== GAME_STATES.PLAYING) return;
-
-    gameLoopRef.current = setInterval(() => {
-      setTimeLeft((prev) => {
-        if (prev <= 100) {
-          // Time's up - wrong answer
-          handleAnswer(null);
-          return getTimeForLevel(level);
-        }
-        return prev - 100;
-      });
-    }, 100);
-
-    return () => clearInterval(gameLoopRef.current);
-  }, [gameState, level, getTimeForLevel]);
-
-  const showFeedbackAnimation = (isCorrect) => {
-    setShowFeedback(isCorrect);
+  const showFeedbackAnimation = (isCorrect, points = 0) => {
+    feedbackAnim.stopAnimation();
+    setShowFeedback({ isCorrect, points });
     feedbackAnim.setValue(1);
     Animated.timing(feedbackAnim, {
       toValue: 0,
-      duration: 800,
+      duration: 600,
       useNativeDriver: true,
-    }).start(() => setShowFeedback(null));
+    }).start(({ finished }) => {
+      if (finished) setShowFeedback(null);
+    });
   };
 
   const shakeScreen = () => {
@@ -154,49 +163,60 @@ export default function App() {
   };
 
   const handleAnswer = useCallback((userSaysFlies) => {
-    // Prevent accidental double-taps with debounce
-    if (gameState !== GAME_STATES.PLAYING || isAnswering) return;
-
+    // Lock immediately: state alone cannot block taps queued before a render.
+    if (gameState !== GAME_STATES.PLAYING || answerLockRef.current) return;
+    answerLockRef.current = true;
+    clearInterval(gameLoopRef.current);
     setIsAnswering(true);
 
-    // Reset debounce after delay (in case nextQuestion doesn't get called)
-    setTimeout(() => setIsAnswering(false), ANSWER_DEBOUNCE_MS);
-
-    const isCorrect = userSaysFlies === canFly;
+    const isCorrect = timeLeft > 0 && userSaysFlies === canFly;
+    let nextLevel = level;
+    notifyAnswer(isCorrect);
 
     if (isCorrect) {
-      // Correct answer
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       const points = 10 + streak * 2 + level * 5;
-      setScore((prev) => prev + points);
-      setStreak((prev) => prev + 1);
-      showFeedbackAnimation(true);
-
-      // Level up every 5 correct answers
-      if ((score + points) >= level * 50) {
-        setLevel((prev) => prev + 1);
-      }
+      const nextScore = score + points;
+      nextLevel = Math.floor(nextScore / 50) + 1;
+      setScore(nextScore);
+      setLevel(nextLevel);
+      setStreak(streak + 1);
+      showFeedbackAnimation(true, points);
     } else {
-      // Wrong answer
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       shakeScreen();
       setStreak(0);
-      setLives((prev) => {
-        const newLives = prev - 1;
-        if (newLives <= 0) {
-          setGameState(GAME_STATES.GAME_OVER);
-          saveHighScore(score);
-          return 0;
-        }
-        return newLives;
-      });
+      const nextLives = Math.max(0, lives - 1);
+      setLives(nextLives);
       showFeedbackAnimation(false);
+      if (nextLives === 0) {
+        setIsNewHighScore(score > highScore);
+        setGameState(GAME_STATES.GAME_OVER);
+        saveHighScore(score);
+        return;
+      }
     }
 
-    if (lives > 1 || isCorrect) {
-      nextQuestion();
+    nextQuestionTimeoutRef.current = setTimeout(() => {
+      nextQuestion(nextLevel);
+    }, ANSWER_DEBOUNCE_MS);
+  }, [gameState, canFly, streak, level, score, lives, highScore, timeLeft, nextQuestion, saveHighScore]);
+
+  // Pause the countdown while feedback is shown. Keep state updaters pure.
+  useEffect(() => {
+    if (gameState !== GAME_STATES.PLAYING || isAnswering) return;
+    const interval = setInterval(() => {
+      if (answerLockRef.current) return;
+      setTimeLeft((prev) => Math.max(0, prev - 100));
+    }, 100);
+    gameLoopRef.current = interval;
+    return () => clearInterval(interval);
+  }, [gameState, isAnswering]);
+
+  // Resolve expiry with the current question, score and lives.
+  useEffect(() => {
+    if (timeLeft === 0 && gameState === GAME_STATES.PLAYING && !isAnswering) {
+      handleAnswer(null);
     }
-  }, [gameState, canFly, streak, level, score, lives, nextQuestion, saveHighScore, isAnswering]);
+  }, [timeLeft, gameState, isAnswering, handleAnswer]);
 
   const renderStartScreen = () => (
     <View style={styles.centerContainer}>
@@ -235,6 +255,9 @@ export default function App() {
       <TouchableOpacity
         style={styles.playButton}
         onPress={startGame}
+        accessibilityRole="button"
+        accessibilityLabel="Play"
+        accessibilityHint="Starts a new game of Chidiya Ud"
         activeOpacity={0.8}
       >
         <LinearGradient
@@ -312,9 +335,9 @@ export default function App() {
         >
           <Text style={[
             styles.feedbackText,
-            { color: showFeedback ? '#2ecc71' : '#e74c3c' }
-          ]}>
-            {showFeedback ? '✓ CORRECT!' : '✗ WRONG!'}
+            { color: showFeedback.isCorrect ? '#2ecc71' : '#e74c3c' }
+          ]} accessibilityLiveRegion="polite">
+            {showFeedback.isCorrect ? `✓ CORRECT! +${showFeedback.points}` : '✗ WRONG!'}
           </Text>
         </Animated.View>
       )}
@@ -324,6 +347,11 @@ export default function App() {
         <TouchableOpacity
           style={styles.answerButton}
           onPress={() => handleAnswer(true)}
+          disabled={isAnswering}
+          accessibilityRole="button"
+          accessibilityLabel="Fly"
+          accessibilityHint="Answers that the current item can fly"
+          accessibilityState={{ disabled: isAnswering }}
           activeOpacity={0.8}
         >
           <LinearGradient colors={['#27D7A1', '#12A878']} style={styles.answerGradient}>
@@ -336,6 +364,11 @@ export default function App() {
         <TouchableOpacity
           style={styles.answerButton}
           onPress={() => handleAnswer(false)}
+          disabled={isAnswering}
+          accessibilityRole="button"
+          accessibilityLabel="Can’t fly"
+          accessibilityHint="Answers that the current item cannot fly"
+          accessibilityState={{ disabled: isAnswering }}
           activeOpacity={0.8}
         >
           <LinearGradient colors={['#FF6B7A', '#E94262']} style={styles.answerGradient}>
@@ -357,7 +390,7 @@ export default function App() {
       <View style={styles.scoreBox}>
         <Text style={styles.finalScoreLabel}>Final Score</Text>
         <Text style={styles.finalScore}>{score}</Text>
-        {score > highScore && score > 0 && (
+        {isNewHighScore && (
           <Text style={styles.newHighScore}>NEW HIGH SCORE! 🎉</Text>
         )}
       </View>
@@ -370,6 +403,9 @@ export default function App() {
       <TouchableOpacity
         style={styles.playButton}
         onPress={startGame}
+        accessibilityRole="button"
+        accessibilityLabel="Play Again"
+        accessibilityHint="Starts a new game with three lives"
         activeOpacity={0.8}
       >
       <LinearGradient
@@ -383,6 +419,9 @@ export default function App() {
       <TouchableOpacity
         style={styles.homeButton}
         onPress={() => setGameState(GAME_STATES.START)}
+        accessibilityRole="button"
+        accessibilityLabel="Home"
+        accessibilityHint="Returns to the start screen"
         activeOpacity={0.8}
       >
         <Text style={styles.homeButtonText}>HOME</Text>
@@ -726,6 +765,7 @@ const styles = StyleSheet.create({
   },
   answerButton: {
     flex: 1,
+    minHeight: 48,
     borderRadius: 22,
     overflow: 'hidden',
     elevation: 5,
