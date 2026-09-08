@@ -26,6 +26,18 @@ const GAME_STATES = {
 // Debounce delay to prevent accidental double-taps (ms)
 const ANSWER_DEBOUNCE_MS = 300;
 
+const SkyDecor = () => (
+  <View style={styles.skyDecor} pointerEvents="none">
+    <View style={[styles.glowOrb, styles.glowOrbTop]} />
+    <View style={[styles.glowOrb, styles.glowOrbBottom]} />
+    <Text style={[styles.cloud, styles.cloudOne]}>☁</Text>
+    <Text style={[styles.cloud, styles.cloudTwo]}>☁</Text>
+    <Text style={[styles.sparkle, styles.sparkleOne]}>✦</Text>
+    <Text style={[styles.sparkle, styles.sparkleTwo]}>✦</Text>
+    <Text style={[styles.sparkle, styles.sparkleThree]}>·</Text>
+  </View>
+);
+
 export default function App() {
   const [gameState, setGameState] = useState(GAME_STATES.START);
   const [score, setScore] = useState(0);
@@ -188,19 +200,36 @@ export default function App() {
 
   const renderStartScreen = () => (
     <View style={styles.centerContainer}>
+      <View style={styles.logoMark}>
+        <Text style={styles.logoBird}>🕊️</Text>
+      </View>
+      <View style={styles.eyebrowBadge}>
+        <Text style={styles.eyebrowText}>QUICK THINKING • FAST FINGERS</Text>
+      </View>
       <Text style={styles.title}>CHIDIYA UD!</Text>
-      <Text style={styles.subtitle}>The Flying Game</Text>
+      <Text style={styles.subtitle}>What belongs in the sky?</Text>
 
       <View style={styles.instructionsBox}>
-        <Text style={styles.instructionTitle}>How to Play</Text>
-        <Text style={styles.instruction}>A word will appear on screen</Text>
-        <Text style={styles.instruction}>Tap FLY if it can fly</Text>
-        <Text style={styles.instruction}>Tap NO if it cannot</Text>
-        <Text style={styles.instruction}>Speed increases each level!</Text>
+        <Text style={styles.instructionTitle}>HOW TO PLAY</Text>
+        <View style={styles.instructionRow}>
+          <View style={styles.stepBubble}><Text style={styles.stepNumber}>1</Text></View>
+          <Text style={styles.instruction}>Read the item on the card</Text>
+        </View>
+        <View style={styles.instructionRow}>
+          <View style={styles.stepBubble}><Text style={styles.stepNumber}>2</Text></View>
+          <Text style={styles.instruction}>Choose FLY or CAN'T FLY</Text>
+        </View>
+        <View style={styles.instructionRow}>
+          <View style={styles.stepBubble}><Text style={styles.stepNumber}>3</Text></View>
+          <Text style={styles.instruction}>Build your streak before time runs out</Text>
+        </View>
       </View>
 
       {highScore > 0 && (
-        <Text style={styles.highScoreText}>Best: {highScore}</Text>
+        <View style={styles.highScoreBadge}>
+          <Text style={styles.highScoreIcon}>🏆</Text>
+          <Text style={styles.highScoreText}>PERSONAL BEST  {highScore}</Text>
+        </View>
       )}
 
       <TouchableOpacity
@@ -209,10 +238,12 @@ export default function App() {
         activeOpacity={0.8}
       >
         <LinearGradient
-          colors={['#667eea', '#764ba2']}
+          colors={['#7C5CFC', '#4B8CFF']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
           style={styles.buttonGradient}
         >
-          <Text style={styles.playButtonText}>PLAY</Text>
+          <Text style={styles.playButtonText}>TAKE FLIGHT  →</Text>
         </LinearGradient>
       </TouchableOpacity>
     </View>
@@ -242,34 +273,33 @@ export default function App() {
       </View>
 
       {/* Timer Bar */}
+      <View style={styles.timerHeader}>
+        <Text style={styles.timerLabel}>TIME TO DECIDE</Text>
+        <Text style={styles.timerValue}>{(timeLeft / 1000).toFixed(1)}s</Text>
+      </View>
       <View style={styles.timerContainer}>
-        <View
-          style={[
-            styles.timerBar,
-            {
-              width: `${(timeLeft / getTimeForLevel(level)) * 100}%`,
-              backgroundColor: timeLeft < 1000 ? '#e74c3c' : '#667eea'
-            }
-          ]}
+        <LinearGradient
+          colors={timeLeft < 1000 ? ['#FF8A7A', '#FF4D6D'] : ['#62E6FF', '#7C5CFC']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+          style={[styles.timerBar, { width: `${(timeLeft / getTimeForLevel(level)) * 100}%` }]}
         />
       </View>
 
       {/* Streak */}
       {streak > 2 && (
-        <Text style={styles.streakText}>{streak} Streak! 🔥</Text>
+        <View style={styles.streakBadge}><Text style={styles.streakText}>🔥 {streak} ANSWER STREAK</Text></View>
       )}
 
       {/* Current Item */}
       <View style={styles.itemContainer}>
-        <Animated.Text
-          style={[
-            styles.itemText,
-            { transform: [{ scale: scaleAnim }] }
-          ]}
-        >
-          {currentItem}
-        </Animated.Text>
-        <Text style={styles.questionText}>Can it fly?</Text>
+        <Animated.View style={[styles.itemCard, { transform: [{ scale: scaleAnim }] }]}>
+          <View style={styles.cardAccent} />
+          <Text style={styles.cardPrompt}>CAN IT FLY?</Text>
+          <Text style={styles.itemText}>{currentItem}</Text>
+          <View style={styles.cardDivider} />
+          <Text style={styles.questionText}>Trust your instinct!</Text>
+        </Animated.View>
       </View>
 
       {/* Feedback */}
@@ -292,21 +322,27 @@ export default function App() {
       {/* Answer Buttons */}
       <View style={styles.buttonsContainer}>
         <TouchableOpacity
-          style={[styles.answerButton, styles.flyButton]}
+          style={styles.answerButton}
           onPress={() => handleAnswer(true)}
           activeOpacity={0.8}
         >
-          <Text style={styles.buttonEmoji}>🦅</Text>
-          <Text style={styles.answerButtonText}>FLY!</Text>
+          <LinearGradient colors={['#27D7A1', '#12A878']} style={styles.answerGradient}>
+            <Text style={styles.buttonEmoji}>🪽</Text>
+            <Text style={styles.answerButtonText}>FLY</Text>
+            <Text style={styles.answerHint}>YES, IT CAN</Text>
+          </LinearGradient>
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={[styles.answerButton, styles.noButton]}
+          style={styles.answerButton}
           onPress={() => handleAnswer(false)}
           activeOpacity={0.8}
         >
-          <Text style={styles.buttonEmoji}>🚫</Text>
-          <Text style={styles.answerButtonText}>NO</Text>
+          <LinearGradient colors={['#FF6B7A', '#E94262']} style={styles.answerGradient}>
+            <Text style={styles.buttonEmoji}>✕</Text>
+            <Text style={styles.answerButtonText}>NO</Text>
+            <Text style={styles.answerHint}>CAN'T FLY</Text>
+          </LinearGradient>
         </TouchableOpacity>
       </View>
     </Animated.View>
@@ -314,7 +350,9 @@ export default function App() {
 
   const renderGameOverScreen = () => (
     <View style={styles.centerContainer}>
+      <View style={styles.gameOverIcon}><Text style={styles.gameOverEmoji}>🏁</Text></View>
       <Text style={styles.gameOverTitle}>GAME OVER</Text>
+      <Text style={styles.gameOverSubtitle}>Great flight! Ready for another round?</Text>
 
       <View style={styles.scoreBox}>
         <Text style={styles.finalScoreLabel}>Final Score</Text>
@@ -334,11 +372,11 @@ export default function App() {
         onPress={startGame}
         activeOpacity={0.8}
       >
-        <LinearGradient
-          colors={['#667eea', '#764ba2']}
+      <LinearGradient
+          colors={['#7C5CFC', '#4B8CFF']}
           style={styles.buttonGradient}
         >
-          <Text style={styles.playButtonText}>PLAY AGAIN</Text>
+          <Text style={styles.playButtonText}>PLAY AGAIN  ↻</Text>
         </LinearGradient>
       </TouchableOpacity>
 
@@ -356,9 +394,10 @@ export default function App() {
     <SafeAreaView style={styles.container}>
       <StatusBar style="light" />
       <LinearGradient
-        colors={['#1a1a2e', '#16213e', '#0f3460']}
+        colors={['#0B1026', '#111D44', '#162A5A']}
         style={styles.gradient}
       >
+        <SkyDecor />
         {gameState === GAME_STATES.START && renderStartScreen()}
         {gameState === GAME_STATES.PLAYING && renderGameScreen()}
         {gameState === GAME_STATES.GAME_OVER && renderGameOverScreen()}
@@ -374,12 +413,47 @@ const styles = StyleSheet.create({
   },
   gradient: {
     flex: 1,
+    overflow: 'hidden',
   },
+  skyDecor: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  glowOrb: {
+    position: 'absolute',
+    width: 280,
+    height: 280,
+    borderRadius: 140,
+    backgroundColor: 'rgba(105, 92, 255, 0.16)',
+  },
+  glowOrbTop: {
+    top: -110,
+    right: -90,
+  },
+  glowOrbBottom: {
+    bottom: -150,
+    left: -110,
+    backgroundColor: 'rgba(36, 211, 238, 0.10)',
+  },
+  cloud: {
+    position: 'absolute',
+    color: 'rgba(255, 255, 255, 0.06)',
+    fontSize: 96,
+  },
+  cloudOne: { top: '18%', left: -25 },
+  cloudTwo: { bottom: '18%', right: -20, fontSize: 120 },
+  sparkle: {
+    position: 'absolute',
+    color: 'rgba(255, 255, 255, 0.28)',
+    fontSize: 18,
+  },
+  sparkleOne: { top: '12%', left: '14%' },
+  sparkleTwo: { top: '32%', right: '10%', fontSize: 12 },
+  sparkleThree: { bottom: '20%', left: '18%', fontSize: 32 },
   centerContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
+    padding: 24,
   },
   gameContainer: {
     flex: 1,
@@ -387,89 +461,166 @@ const styles = StyleSheet.create({
     paddingTop: Platform.OS === 'android' ? 40 : 20,
   },
   title: {
-    fontSize: 48,
+    fontSize: 46,
     fontWeight: '900',
-    color: '#667eea',
+    color: '#FFFFFF',
     textAlign: 'center',
-    textShadowColor: 'rgba(102, 126, 234, 0.5)',
-    textShadowOffset: { width: 0, height: 0 },
-    textShadowRadius: 20,
+    letterSpacing: -1.5,
+    textShadowColor: 'rgba(93, 128, 255, 0.6)',
+    textShadowOffset: { width: 0, height: 4 },
+    textShadowRadius: 18,
+  },
+  logoMark: {
+    width: 86,
+    height: 86,
+    borderRadius: 43,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.22)',
+  },
+  logoBird: { fontSize: 48 },
+  eyebrowBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+    backgroundColor: 'rgba(98, 230, 255, 0.12)',
+    marginBottom: 10,
+  },
+  eyebrowText: {
+    color: '#7DEBFF',
+    fontSize: 9,
+    fontWeight: '800',
+    letterSpacing: 1.3,
   },
   subtitle: {
-    fontSize: 20,
-    color: '#a0a0a0',
-    marginBottom: 40,
+    fontSize: 17,
+    color: '#AAB6D8',
+    marginTop: 6,
+    marginBottom: 28,
   },
   instructionsBox: {
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: 20,
-    padding: 25,
-    marginBottom: 30,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.13)',
+    padding: 20,
+    marginBottom: 20,
     width: '100%',
-    maxWidth: 300,
+    maxWidth: 360,
   },
   instructionTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#fff',
-    textAlign: 'center',
-    marginBottom: 15,
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#7DEBFF',
+    letterSpacing: 1.5,
+    marginBottom: 12,
   },
+  instructionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 6,
+  },
+  stepBubble: {
+    width: 27,
+    height: 27,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(124, 92, 252, 0.35)',
+    marginRight: 12,
+  },
+  stepNumber: { color: '#FFFFFF', fontSize: 12, fontWeight: '800' },
   instruction: {
-    fontSize: 14,
-    color: '#a0a0a0',
-    textAlign: 'center',
-    marginVertical: 5,
+    flex: 1,
+    fontSize: 13,
+    color: '#D5DDF3',
   },
+  highScoreBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(254, 202, 87, 0.12)',
+    borderRadius: 20,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    marginBottom: 18,
+  },
+  highScoreIcon: { fontSize: 15, marginRight: 7 },
   highScoreText: {
-    fontSize: 18,
-    color: '#feca57',
-    marginBottom: 20,
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.8,
+    color: '#FECA57',
   },
   playButton: {
-    borderRadius: 30,
+    borderRadius: 18,
     overflow: 'hidden',
     elevation: 5,
-    shadowColor: '#667eea',
+    shadowColor: '#7C5CFC',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 10,
+    shadowOpacity: 0.5,
+    shadowRadius: 14,
   },
   buttonGradient: {
-    paddingVertical: 18,
-    paddingHorizontal: 60,
-    borderRadius: 30,
+    paddingVertical: 17,
+    paddingHorizontal: 48,
+    borderRadius: 18,
   },
   playButtonText: {
-    fontSize: 22,
-    fontWeight: '700',
+    fontSize: 15,
+    fontWeight: '900',
+    letterSpacing: 1,
     color: '#fff',
     textAlign: 'center',
   },
   hud: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 15,
+    marginBottom: 22,
   },
   hudItem: {
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: 15,
-    padding: 12,
-    minWidth: 80,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
+    paddingVertical: 11,
+    paddingHorizontal: 9,
+    minWidth: width > 380 ? 100 : 82,
     alignItems: 'center',
   },
   hudLabel: {
-    fontSize: 10,
-    color: '#888',
-    letterSpacing: 1,
+    fontSize: 9,
+    color: '#8692B6',
+    fontWeight: '800',
+    letterSpacing: 1.2,
   },
   hudValue: {
-    fontSize: 20,
-    fontWeight: '700',
+    fontSize: 19,
+    fontWeight: '900',
     color: '#fff',
+    marginTop: 3,
+  },
+  timerHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 7,
+  },
+  timerLabel: {
+    color: '#8996BC',
+    fontSize: 9,
+    fontWeight: '800',
+    letterSpacing: 1.1,
+  },
+  timerValue: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '800',
   },
   timerContainer: {
-    height: 8,
+    height: 7,
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
     borderRadius: 4,
     marginBottom: 20,
@@ -480,30 +631,80 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   streakText: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#feca57',
+    fontSize: 11,
+    fontWeight: '900',
+    color: '#FFD66B',
+    letterSpacing: 0.8,
     textAlign: 'center',
-    marginBottom: 10,
+  },
+  streakBadge: {
+    alignSelf: 'center',
+    backgroundColor: 'rgba(254, 202, 87, 0.12)',
+    borderRadius: 15,
+    paddingVertical: 7,
+    paddingHorizontal: 13,
+    marginBottom: 12,
   },
   itemContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
+  itemCard: {
+    width: '100%',
+    maxWidth: 430,
+    minHeight: 230,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 28,
+    borderRadius: 30,
+    backgroundColor: 'rgba(255, 255, 255, 0.10)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.18)',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 16 },
+    shadowOpacity: 0.25,
+    shadowRadius: 25,
+    elevation: 8,
+    overflow: 'hidden',
+  },
+  cardAccent: {
+    position: 'absolute',
+    top: 0,
+    width: 75,
+    height: 4,
+    borderBottomLeftRadius: 4,
+    borderBottomRightRadius: 4,
+    backgroundColor: '#69E5FF',
+  },
+  cardPrompt: {
+    color: '#7DEBFF',
+    fontSize: 11,
+    fontWeight: '900',
+    letterSpacing: 2,
+    marginBottom: 18,
+  },
   itemText: {
-    fontSize: 52,
+    fontSize: 48,
     fontWeight: '900',
     color: '#fff',
     textAlign: 'center',
-    textShadowColor: 'rgba(102, 126, 234, 0.5)',
-    textShadowOffset: { width: 0, height: 0 },
-    textShadowRadius: 15,
+    letterSpacing: -1,
+    textShadowColor: 'rgba(86, 122, 255, 0.55)',
+    textShadowOffset: { width: 0, height: 4 },
+    textShadowRadius: 12,
+  },
+  cardDivider: {
+    width: 32,
+    height: 2,
+    borderRadius: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.22)',
+    marginTop: 20,
   },
   questionText: {
-    fontSize: 20,
-    color: '#a0a0a0',
-    marginTop: 20,
+    fontSize: 13,
+    color: '#AAB6D8',
+    marginTop: 12,
   },
   feedback: {
     position: 'absolute',
@@ -518,57 +719,84 @@ const styles = StyleSheet.create({
   },
   buttonsContainer: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
+    justifyContent: 'space-between',
+    gap: 14,
+    paddingTop: 22,
     paddingBottom: 30,
   },
   answerButton: {
-    width: width * 0.4,
-    paddingVertical: 25,
-    borderRadius: 25,
-    alignItems: 'center',
+    flex: 1,
+    borderRadius: 22,
+    overflow: 'hidden',
     elevation: 5,
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 10,
+    shadowOpacity: 0.25,
+    shadowRadius: 9,
   },
-  flyButton: {
-    backgroundColor: '#2ecc71',
-    shadowColor: '#2ecc71',
-  },
-  noButton: {
-    backgroundColor: '#e74c3c',
-    shadowColor: '#e74c3c',
+  answerGradient: {
+    paddingVertical: 17,
+    minHeight: 116,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   buttonEmoji: {
-    fontSize: 36,
-    marginBottom: 5,
+    fontSize: 29,
+    marginBottom: 3,
   },
   answerButtonText: {
-    fontSize: 22,
-    fontWeight: '700',
+    fontSize: 20,
+    fontWeight: '900',
     color: '#fff',
   },
+  answerHint: {
+    color: 'rgba(255, 255, 255, 0.72)',
+    fontSize: 8,
+    fontWeight: '800',
+    letterSpacing: 1.2,
+    marginTop: 2,
+  },
+  gameOverIcon: {
+    width: 78,
+    height: 78,
+    borderRadius: 39,
+    backgroundColor: 'rgba(255, 107, 122, 0.14)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 18,
+  },
+  gameOverEmoji: { fontSize: 38 },
   gameOverTitle: {
-    fontSize: 42,
+    fontSize: 40,
     fontWeight: '900',
-    color: '#e74c3c',
-    marginBottom: 30,
+    color: '#FFFFFF',
+    letterSpacing: -1,
+  },
+  gameOverSubtitle: {
+    color: '#AAB6D8',
+    fontSize: 14,
+    marginTop: 7,
+    marginBottom: 25,
   },
   scoreBox: {
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
     borderRadius: 25,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.13)',
     padding: 30,
+    minWidth: 240,
     alignItems: 'center',
     marginBottom: 20,
   },
   finalScoreLabel: {
-    fontSize: 16,
-    color: '#888',
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 1.5,
+    color: '#8996BC',
   },
   finalScore: {
     fontSize: 64,
     fontWeight: '900',
-    color: '#fff',
+    color: '#7DEBFF',
   },
   newHighScore: {
     fontSize: 18,
